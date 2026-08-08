@@ -1,0 +1,55 @@
+{
+  "action_counts": {
+    "improve_relevance_striking": 8358,
+    "review_onpage_engagement": 6121,
+    "review_snippet_and_refresh": 8972,
+    "review_snippet_ctr": 25253
+  },
+  "base_rate_test": 0.159,
+  "inventory_pages": 120258,
+  "precision_client_holdout": {
+    "baseline": {
+      "k10": 0.3,
+      "k50": 0.44
+    },
+    "logistic": {
+      "k10": 0.5,
+      "k50": 0.32
+    },
+    "random_forest": {
+      "k10": 0.1,
+      "k50": 0.14
+    }
+  },
+  "precision_random_split": {
+    "baseline": {
+      "k10": 1.0,
+      "k50": 0.96
+    },
+    "logistic": {
+      "k10": 0.9,
+      "k50": 0.96
+    },
+    "random_forest": {
+      "k10": 1.0,
+      "k50": 1.0
+    }
+  },
+  "queue_export": "work/outputs/action_playbook_queue.csv",
+  "queue_size": 48704,
+  "reason_code_counts": {
+    "ctr_opportunity": 42583,
+    "engagement_gap": 8193,
+    "refresh_decay": 16024
+  },
+  "refresh_only_excluded": 6453,
+  "seed": 42,
+  "split": "client_holdout",
+  "tier_ctr_gradient_pct": {
+    "deep": 0.04533694714796107,
+    "page_1": 0.3272001513263199,
+    "page_3_5": 0.14928608086768122,
+    "striking": 0.2895104144650035,
+    "top_3": 0.4058788600989437
+  }
+}
