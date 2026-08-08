@@ -1,8 +1,8 @@
 name: deploy-paper
 
 # Publishes the static research paper in paper/ to GitHub Pages.
-# configure-pages enables Pages itself (enablement: true), so no manual
-# Settings toggle is needed. After that every push to main redeploys.
+# Turn Pages on once: Settings -> Pages -> Source: GitHub Actions.
+# After that every push to main redeploys automatically.
 
 on:
   push:
@@ -30,8 +30,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - name: Upload paper site
         uses: actions/upload-pages-artifact@v3
         with:
