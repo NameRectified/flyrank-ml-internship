@@ -91,77 +91,72 @@
 <section id="abstract">
   <h2>Abstract</h2>
   <div class="abstract">
-    <p>Which of a client's visible pages should a content reviewer open first for a CTR or engagement fix? We looked at 120,258 pages from 47 real clients, with features from January and February 2026 and an outcome measured in March. We compared a logistic regression and a random forest against a transparent rule that scores CTR and engagement gaps by exposure, and validated on clients the model never saw. On held-out clients the rule matched the model at the top of the queue (precision@50 44% vs 32%) and beat it on the wider cut, at a 15.9% base rate; the random forest did not generalize. The output is a ranked, reason-coded review queue that tells a content reviewer which pages to open first.</p>
+    <p>Which of a client's pages should a content reviewer open first for a CTR or engagement fix? We analyzed 120,258 pages from 47 real clients, using features from January and February 2026 to predict an outcome measured in March. We compared a transparent rule (score a page by how much exposure it has and how far its CTR or engagement sits below the norm for its position) against a logistic regression and a random forest, and tested everything on clients the models never saw. On held-out clients, the model did better at the very top of the queue (precision@10: 50% vs 30% for the rule), while the rule held the wider cut (precision@50: 44% vs 32%), against a 15.9% base rate; the random forest did not generalize. The result is a ranked, reason-coded review queue that tells a reviewer which pages to open first, and why.</p>
   </div>
 </section>
 
 <section id="problem">
   <h2>1. The problem</h2>
-  <p>The decision this supports: a content reviewer has limited time and a pool of thousands of pages. Which pages should they open first, and for what kind of fix?</p>
+  <p>A content reviewer's job is triage: thousands of pages per client, limited hours, and a queue that has to be built somehow. This paper tackles one decision: which pages to open first, and for what kind of fix.</p>
   <ul>
-    <li><strong>Decision:</strong> which high-exposure pages to review first, for a CTR fix (title, meta, snippet, intent match) or an engagement fix (on-page structure, depth, intent fulfillment).</li>
-    <li><strong>Who acts:</strong> a content reviewer or editor.</li>
-    <li><strong>Cost of a wrong call:</strong>
-      <ul>
-        <li>False priority: review time spent on pages with low volume or a gap that is mostly noise.</li>
-        <li>Missed opportunity: a page that could have improved never gets looked at.</li>
-      </ul>
-    </li>
+    <li><strong>The decision:</strong> which high-exposure pages to review first, for a CTR fix (title, meta, snippet, intent match) or an engagement fix (on-page structure, depth, intent fulfillment).</li>
+    <li><strong>Who acts on it:</strong> a content reviewer or editor. The queue only decides the order; a human does the reviewing and editing.</li>
+    <li><strong>Cost of a wrong call:</strong> review time spent on pages that were never going to move, or pages that could have improved never getting looked at.</li>
   </ul>
-  <p>Why a score instead of a single cutoff: one rule like "below tier CTR" does not fit every page. CTR gaps differ by content type and engagement gaps by intent, so a combined score can rank the whole queue instead of flagging one slice. The question is whether a simple rule can rank that queue as well as a trained model on new clients.</p>
+  <p>Why a score instead of a single cutoff? A blanket rule like "fix every page with below-average CTR" does not fit every page. A CTR gap that is normal for one content type can be a real problem for another, and engagement gaps depend on intent. So instead of flagging one slice, we score the whole queue. The question this paper actually tests is whether a simple, explainable rule can rank that queue as well as a trained model on clients it has never seen.</p>
 </section>
 
 <section id="data">
   <h2>2. Data</h2>
-  <p>This analysis uses the FlyRank ML Internship warehouse (gated Hugging Face release). Two tables:</p>
+  <p>Everything here runs on the FlyRank ML Internship warehouse (a gated Hugging Face release). Two tables matter:</p>
   <ul>
-    <li><code>fact_content_daily_performance</code>: daily search and analytics data per page, including impressions, clicks, average position, sessions, and engaged sessions.</li>
-    <li><code>dim_content</code>: page metadata such as content type, main intent, and created and updated dates.</li>
+    <li><code>fact_content_daily_performance</code>: daily search and analytics per page (impressions, clicks, average position, sessions, engaged sessions).</li>
+    <li><code>dim_content</code>: page metadata such as content type, main intent, and created/updated dates.</li>
   </ul>
-  <h3>Date windows</h3>
+  <h3>Time windows</h3>
   <ul>
-    <li><strong>Feature window:</strong> January 1 to February 28, 2026. Everything a model is allowed to see.</li>
+    <li><strong>Feature window:</strong> January 1 – February 28, 2026. Everything a model is allowed to see.</li>
     <li><strong>Outcome window:</strong> March 2026. Where the label is measured.</li>
     <li><strong>Decision moment:</strong> March 1, 2026. At that point the feature window is known and the outcome is not.</li>
   </ul>
   <p><strong>Unit of analysis:</strong> one row is one page (<code>content_hash_id</code>) for one client, summarized over the feature window.</p>
-  <h3>What we excluded and why</h3>
+  <h3>What we left out, and why</h3>
   <ul>
     <li>Measurement flags (<code>gsc_data_available</code>, <code>ga4_data_available</code>): used only to filter rows, never as features.</li>
-    <li><code>trend_direction</code> and <code>trend_pct</code>: they answer a different question (trend decline), not opportunity scoring.</li>
+    <li><code>trend_direction</code> and <code>trend_pct</code>: they answer a different question (trend decline), not which pages to fix.</li>
     <li>Pages under 100 impressions: not loaded at all.</li>
-    <li>Pages under 500 impressions: kept out of the queue because their CTR is mostly noise. This misses some real opportunities; that is the stated cost of a low-noise queue.</li>
+    <li>Pages under 500 impressions: kept out of the queue because their CTR is mostly noise. This misses some real opportunities, but that is the stated cost of a low-noise queue.</li>
   </ul>
-  <p><strong>Public safety:</strong> only pseudonymized hashes ever leave this notebook. No client names, URLs, or raw queries.</p>
+  <p><strong>Public safety:</strong> only pseudonymized hashes ever leave the notebook. No client names, URLs, or raw queries.</p>
 </section>
 
 <section id="method">
   <h2>3. Method</h2>
-  <p><strong>The label:</strong> <code>below_tier_outcome</code>. A page is a positive case when its CTR in the outcome window (March 2026) is more than 0.1 percentage points below the weighted CTR median of its position tier. The label is the observed outcome and nothing else. An earlier version of the label also required the same gap in the feature window. That was a leak, because the feature-window gap is a feature and half the label became knowable at the decision moment. That condition was removed.</p>
+  <p><strong>The label:</strong> <code>below_tier_outcome</code>. A page counts as a "positive" when its CTR in the outcome window (March 2026) is more than 0.1 percentage points below the weighted CTR median of its position tier. The label is the observed outcome and nothing else. An earlier version of the label also required the same gap in the feature window. That was a leak: the feature-window gap is a feature, so half the label would have been knowable on decision day. That condition is gone.</p>
   <h3>Features</h3>
-  <p>All knowable at the decision moment:</p>
+  <p>Everything the models see is knowable on March 1:</p>
   <ul>
     <li><code>log_impressions_fw</code>, <code>ctr_fw</code>, <code>avg_pos_fw</code>, <code>pos_volatility_fw</code>, <code>engagement_rate_fw</code>, <code>log_sessions_fw</code>, <code>tier_ctr_gap</code></li>
     <li><code>content_type</code>, <code>main_intent</code>, <code>position_tier</code></li>
   </ul>
   <h3>Baseline</h3>
-  <p>A transparent rule: <code>score = has_volume * max(tier_ctr_gap, 0) * impressions_fw</code>. It ranks pages by exposure times gap, with a floor of 500 impressions. This is the rule the playbook uses.</p>
+  <p>A transparent rule that any human can check: <code>score = has_volume * max(tier_ctr_gap, 0) * impressions_fw</code>. It ranks pages by exposure times gap, with a floor of 500 impressions. This is the rule the playbook uses.</p>
   <h3>Models</h3>
   <p>Logistic regression and a random forest, with scaled numeric features and one-hot encoded categories, balanced class weights, and random seed 42.</p>
   <h3>Validation</h3>
-  <p>Two splits on the same data. A random split (pages from the same client can appear on both sides) and a client-holdout split (whole clients held out). The client-holdout split is the honest number, because the queue must rank pages for clients the model never saw.</p>
+  <p>Two splits on the same data. A random split (pages from the same client can land on both sides) and a client-holdout split (whole clients held out). The client holdout is the number that matters, because the queue has to rank pages for clients the model has never met.</p>
   <h3>Leakage checks, four</h3>
   <ol>
     <li>Feature window: every feature ends before March 1.</li>
     <li>Product flags: none exist in the warehouse.</li>
-    <li>Tier medians: recomputing them on training data only changed precision by almost nothing, so the leak is real but mild.</li>
+    <li>Tier medians: recomputing them on training data only changed precision by almost nothing, so the effect is real but mild.</li>
     <li>Label source: the corrected label uses the March outcome only. 9,858 pages would differ under the old two-window label.</li>
   </ol>
 </section>
 
 <section id="results">
   <h2>4. Results vs baseline</h2>
-  <p>The honest number is the held-out table below: whole clients held out, at a 15.9% base rate.</p>
+  <p>The number that matters is the held-out table below: whole clients held out, at a 15.9% base rate.</p>
   <table>
     <tr>
       <th>Method (client holdout)</th>
@@ -193,7 +188,7 @@
   <ul>
     <li>Logistic regression wins the very top of the queue: precision@10 50% vs 30% for the rule.</li>
     <li>The rule holds the wider cut: precision@50 44% vs 32% for logistic regression.</li>
-    <li>Both beat the base rate by a wide margin, so the ranking carries signal.</li>
+    <li>Both beat the base rate by a wide margin, so the ranking carries real signal.</li>
   </ul>
   <p>The trap we avoided: on a random split the models look near perfect (precision@50 96% for both), because pages from the same client leak across both sides. The drop from that split to the client holdout is how much memorization was hiding.</p>
 
@@ -203,7 +198,7 @@
   </figure>
 
   <h3>The signal behind the rule</h3>
-  <p>Weighted CTR falls steadily as pages sit lower in the results. The rule leans on this gradient by scoring exposure times gap.</p>
+  <p>Weighted CTR falls steadily as pages sit lower in the results. The rule leans on that gradient by scoring exposure times gap.</p>
   <figure>
     <img src="assets/playbook_tier_ctr_gradient.svg" alt="Weighted CTR by position tier, from top-3 to deep positions.">
     <figcaption><span class="takeaway">Takeaway: higher positions capture far more clicks per impression (40.6% at top_3 down to 4.5% deep). Descriptive, not a proof that editing lifts CTR.</span></figcaption>
@@ -214,14 +209,15 @@
   <h2>5. Limitations</h2>
   <p>What this work cannot claim:</p>
   <ul>
-    <li><strong>No causal claims.</strong> Ranking pages by opportunity does not prove that editing them improves CTR. That needs a controlled experiment.</li>
+    <li><strong>No causal claims.</strong> Ranking pages by opportunity does not prove that editing them lifts CTR. That would take a controlled experiment.</li>
     <li><strong>One snapshot.</strong> The queue is built at one decision moment (March 1, 2026) and does not follow pages over time.</li>
-    <li><strong>Fixed calendar window.</strong> All pages share the same feature window, but some clients started tracking later, so younger clients get less history or drop out.</li>
-    <li><strong>Tier medians are portfolio level, not per query.</strong> A page can rank for terms where low CTR is normal (comparison or branded queries) and still be a false priority.</li>
+    <li><strong>Fixed calendar window.</strong> Every page shares the same feature window, but some clients started tracking later, so younger clients get less history or drop out.</li>
+    <li><strong>Tier medians are portfolio-level, not per query.</strong> A page can rank for terms where low CTR is normal (comparison or branded queries) and still be a false priority.</li>
     <li><strong>The 500-impression floor is a deliberate trade-off.</strong> It keeps the queue low-noise but misses real opportunities on smaller pages.</li>
     <li><strong>The engagement arm is directional, not validated.</strong> It treats one click as roughly one engaged session, a conservative proxy for content fixes.</li>
     <li><strong>Client mix shifts the base rate.</strong> The held-out clients happened to have a lower below-tier rate (15.9% vs 57.5% on the random split), so results depend on which clients the queue is applied to.</li>
     <li><strong>Random forest precision was not stable run to run</strong> in our environment, so we report it only qualitatively.</li>
+    <li><strong>We tried harder models; none beat the rule.</strong> Beyond the ones shown here, we ran an extended experiment round (gradient boosting, extra features, and a wider model zoo). None of them beat the rule on pages that actually existed at the decision moment; the apparent wins were artifacts of ranking brand-new pages. Full record in the <a href="https://github.com/NameRectified/flyrank-ml-internship/blob/main/work/experiments/README.md">experiment log</a>.</li>
   </ul>
 </section>
 
