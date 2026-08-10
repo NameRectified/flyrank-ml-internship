@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Explore the ranked review queue: which pages should a content reviewer edit first, and why.">
+<title>Review queue explorer</title>
+<style>
+  :root {
+    --ink: #1a2733;
+    --muted: #5b6b7a;
+    --accent: #1f77b4;
+    --line: #e3e8ee;
+    --bg-alt: #f6f8fa;
+    --blue: #1f77b4;
+    --green: #2ca02c;
+    --orange: #e67e22;
+    --purple: #9467bd;
+    --red: #d62728;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    font-size: 16px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px; }
+  header.hero {
+    background: #f0f4f8; border-bottom: 1px solid var(--line);
+    padding: 30px 0 24px;
+  }
+  header.hero h1 { font-size: 24px; line-height: 1.25; margin: 0 0 8px; }
+  header.hero p.sub { color: var(--muted); font-size: 15px; margin: 0 0 10px; }
+  .backlink { font-size: 14px; }
+  .backlink a { color: var(--accent); text-decoration: none; }
+  .backlink a:hover { text-decoration: underline; }
+
+  .summary {
+    display: flex; flex-wrap: wrap; gap: 8px 24px;
+    margin: 18px 0 6px; font-size: 14px; color: var(--muted);
+  }
+  .summary b { color: var(--ink); }
+  .summary .filtered { color: var(--accent); font-weight: 600; }
+
+  .controls {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px; margin: 10px 0 16px;
+  }
+  .controls label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  select, input {
+    width: 100%; padding: 7px 9px; font-size: 14px;
+    border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink);
+  }
+  .search { grid-column: span 2; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 900px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--bg-alt); font-weight: 600; position: sticky; top: 0; }
+  td.num, th.num { text-align: right; }
+  tr.row { cursor: pointer; }
+  tr.row:hover td { background: #fafcff; }
+  tr.detail td { background: var(--bg-alt); font-size: 12.5px; color: var(--muted); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; color: var(--muted); }
+  .badge, .chip {
+    display: inline-block; padding: 2px 7px; border-radius: 10px;
+    font-size: 11.5px; font-weight: 600; margin: 1px 3px 1px 0; white-space: nowrap;
+  }
+  .chip-ctr_opportunity, .b-visible_ctr_underperformer { background: #e7f1fa; color: var(--blue); }
+  .chip-engagement_gap, .b-visible_engagement_weak { background: #e7f5e7; color: var(--green); }
+  .chip-refresh_decay, .b-visible_ctr_stale { background: #fdf1e3; color: var(--orange); }
+  .b-visible_ctr_striking { background: #f0eaf8; color: var(--purple); }
+  .action { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .empty { padding: 26px; text-align: center; color: var(--muted); }
+
+  details.note { margin: 18px 0; font-size: 14px; }
+  details.note summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+  details.note .inner { border: 1px solid var(--line); background: var(--bg-alt); border-radius: 4px; padding: 12px 16px; margin-top: 8px; }
+  details.note code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; background: #fff; padding: 1px 4px; border-radius: 3px; }
+  footer { padding: 24px 0 40px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="backlink"><a href="../index.html">&larr; back to the paper</a></p>
+    <h1>Review queue explorer</h1>
+    <p class="sub">Which pages should a content reviewer open first, and why. Ranked by the validated score at the March 1, 2026 decision moment.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="summary" id="summary"></div>
+
+  <div class="controls">
+    <div>
+      <label for="f-client">Client</label>
+      <select id="f-client"></select>
+    </div>
+    <div>
+      <label for="f-ct">Content type</label>
+      <select id="f-ct"></select>
+    </div>
+    <div>
+      <label for="f-mi">Main intent</label>
+      <select id="f-mi"></select>
+    </div>
+    <div>
+      <label for="f-pt">Position tier</label>
+      <select id="f-pt"></select>
+    </div>
+    <div>
+      <label for="f-ar">Archetype</label>
+      <select id="f-ar"></select>
+    </div>
+    <div>
+      <label for="f-sort">Sort by</label>
+      <select id="f-sort">
+        <option value="score">Score (high first)</option>
+        <option value="im">Impressions</option>
+        <option value="g">CTR gap</option>
+        <option value="en">Engagement</option>
+      </select>
+    </div>
+    <div>
+      <label for="f-n">Show top</label>
+      <select id="f-n">
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+        <option value="200">200</option>
+        <option value="10000">All</option>
+      </select>
+    </div>
+    <div class="search">
+      <label for="f-q">Search (page or client id)</label>
+      <input id="f-q" type="search" placeholder="e.g. c3a9, client_…">
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Page</th>
+          <th>Client</th>
+          <th>Page profile</th>
+          <th class="num">Score</th>
+          <th>Reasons</th>
+          <th>Action</th>
+          <th class="num">Impressions</th>
+          <th class="num">CTR</th>
+          <th class="num">CTR gap</th>
+          <th class="num">Avg pos</th>
+          <th class="num">Eng.</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <details class="note" open>
+    <summary>What does this mean?</summary>
+    <div class="inner">
+      <p><strong>Score</strong> = <code>ctr_arm</code> + <code>eng_arm</code>. The CTR arm is exposure times the CTR gap below the page's position-tier median (pages with at least 500 impressions). The engagement arm is the engagement gap below the content-type-by-intent target, scaled by sessions (pages with at least 50 sessions).</p>
+      <p><strong>Reason codes</strong> tell you the kind of fix: <span class="badge chip-ctr_opportunity">ctr_opportunity</span> the page is visible but its CTR is below the tier norm, <span class="badge chip-engagement_gap">engagement_gap</span> sessions are there but on-page engagement is weak, <span class="badge chip-refresh_decay">refresh_decay</span> the page is old or stale.</p>
+      <p>This is decision support for a person. It ranks which pages to open; it never edits or publishes anything. See the <a href="../index.html#recommendations">paper's recommendations</a> for the full archetype-to-action mapping.</p>
+    </div>
+  </details>
+
+</main>
+
+<footer>
+  <div class="wrap">A companion to the research paper: <a href="../index.html">Which content pages should a reviewer open first?</a></div>
+</footer>
+
+<script src="queue.js"></script>
+<script>
+(function () {
+  const DATA = window.QUEUE || [];
+  const $ = (id) => document.getElementById(id);
+  const REASON_LABELS = {
+    ctr_opportunity: "ctr opportunity",
+    engagement_gap: "engagement gap",
+    refresh_decay: "refresh decay",
+  };
+  const ARCH_LABELS = {
+    visible_ctr_underperformer: "visible CTR underperformer",
+    visible_ctr_striking: "visible CTR striking",
+    visible_ctr_stale: "visible CTR stale",
+    visible_engagement_weak: "visible engagement weak",
+  };
+
+  const state = { client: "all", ct: "all", mi: "all", pt: "all", ar: "all", sort: "score", n: 50, q: "" };
+
+  function fmtInt(n) { return (n == null ? "-" : Number(n).toLocaleString("en-US")); }
+  function fmtScore(n) { return fmtInt(n); }
+  function fmtPct(n) { return (n == null ? "-" : n.toFixed(3) + "%"); }
+  function fmtPp(n) { return (n == null ? "-" : n.toFixed(3) + " pp"); }
+  function fmtEng(n) { return (n == null ? "-" : n.toFixed(1) + "%"); }
+  function fmtPos(n) { return (n == null ? "-" : n.toFixed(2)); }
+  function shortId(id) {
+    if (!id) return "-";
+    const base = id.replace(/^(client|content)_/, "");
+    return (id.startsWith("client") ? "c" : "p") + "_" + base.slice(0, 5);
+  }
+
+  function unique(key) {
+    const map = new Map();
+    DATA.forEach((d) => { const v = d[key]; if (v != null && v !== "") map.set(v, (map.get(v) || 0) + 1); });
+    return [...map.entries()].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+  }
+
+  function fillSelect(id, entries, allLabel) {
+    const sel = $(id);
+    sel.innerHTML = '<option value="all">' + allLabel + "</option>" +
+      entries.map(([v, c]) => `<option value="${v}">${v} (${c})</option>`).join("");
+  }
+
+  function matches(d) {
+    if (state.client !== "all" && d.c !== state.client) return false;
+    if (state.ct !== "all" && d.ct !== state.ct) return false;
+    if (state.mi !== "all" && d.mi !== state.mi) return false;
+    if (state.pt !== "all" && d.pt !== state.pt) return false;
+    if (state.ar !== "all" && d.ar !== state.ar) return false;
+    if (state.q) {
+      const q = state.q.toLowerCase();
+      if (!d.p.toLowerCase().includes(q) && !d.c.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  }
+
+  function cell(tag, cls, text) {
+    return `<${tag}${cls ? ' class="' + cls + '"' : ""}>${text}</${tag}>`;
+  }
+
+  function rowHtml(d, i) {
+    const reasons = d.rc.map((r) => `<span class="badge chip-${r}">${REASON_LABELS[r] || r}</span>`).join("");
+    const arch = `<span class="chip b-${d.ar}">${ARCH_LABELS[d.ar] || d.ar}</span>`;
+    const profile = `<div>${d.ct} &middot; ${d.mi}</div><div class="mono">${d.pt} · ${arch}</div>`;
+    return `<tr class="row" data-i="${i}">
+      <td class="num">${i + 1}</td>
+      <td class="mono" title="${d.p}">${shortId(d.p)}</td>
+      <td class="mono" title="${d.c}">${shortId(d.c)}</td>
+      <td>${profile}</td>
+      <td class="num"><b>${fmtScore(d.s)}</b></td>
+      <td>${reasons}</td>
+      <td><span class="action">${d.ac.replace(/_/g, " ")}</span></td>
+      <td class="num">${fmtInt(d.im)}</td>
+      <td class="num">${fmtPct(d.cr)}</td>
+      <td class="num">${fmtPp(d.g)}</td>
+      <td class="num">${fmtPos(d.ap)}</td>
+      <td class="num">${fmtEng(d.en)}</td>
+    </tr>
+    <tr class="detail" style="display:none"><td colspan="12">
+      Sessions: <b>${fmtInt(d.se)}</b> &middot; Missed clicks (opportunity): <b>${fmtInt(d.mc)}</b> &middot;
+      Content age: <b>${d.age}d</b>
+    </td></tr>`;
+  }
+
+  function render() {
+    const filtered = DATA.filter(matches);
+    const order = state.sort;
+    filtered.sort((a, b) => {
+      if (order === "im" || order === "g" || order === "en") return (b[order] || 0) - (a[order] || 0);
+      return b.s - a.s;
+    });
+    const shown = filtered.slice(0, state.n);
+    const tbody = $("tbody");
+    tbody.innerHTML = shown.map(rowHtml).join("");
+
+    $("summary").innerHTML =
+      `<span><b>${fmtInt(DATA.length)}</b> pages loaded &middot; <b>${new Set(DATA.map(d => d.c)).size}</b> clients &middot; decision moment March 1, 2026</span>` +
+      `<span class="filtered">Showing ${fmtInt(shown.length)} of ${fmtInt(filtered.length)}</span>`;
+
+    if (!shown.length) tbody.innerHTML = `<tr><td colspan="12" class="empty">No pages match those filters.</td></tr>`;
+  }
+
+  function wire() {
+    ["f-client", "f-ct", "f-mi", "f-pt", "f-ar", "f-sort", "f-n"].forEach((id) => {
+      $(id).addEventListener("change", (e) => {
+        const key = id.slice(2);
+        state[key] = e.target.value;
+        render();
+      });
+    });
+    $("f-q").addEventListener("input", (e) => { state.q = e.target.value.trim(); render(); });
+
+    $("tbody").addEventListener("click", (e) => {
+      const tr = e.target.closest("tr.row");
+      if (!tr) return;
+      const detail = tr.nextElementSibling;
+      if (detail && detail.classList.contains("detail")) detail.style.display = detail.style.display === "none" ? "" : "none";
+    });
+  }
+
+  fillSelect("f-client", unique("c"), "All clients");
+  fillSelect("f-ct", unique("ct"), "All content types");
+  fillSelect("f-mi", unique("mi"), "All intents");
+  fillSelect("f-pt", unique("pt"), "All tiers");
+  fillSelect("f-ar", unique("ar"), "All archetypes");
+  wire();
+  render();
+})();
+</script>
+</body>
+</html>
