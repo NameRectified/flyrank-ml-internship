@@ -230,6 +230,7 @@
     <li><strong>eng_arm:</strong> the engagement gap below <code>eng_target</code> (the weighted median engagement rate for the page's content type and intent), scaled by sessions, only for pages with at least 50 sessions.</li>
   </ul>
   <p><strong>Queue:</strong> pages with a <code>ctr_opportunity</code> or an <code>engagement_gap</code> flag, sorted by score, highest first. Refresh-only pages are counted but kept out, because refreshing is a scheduled task that does not need editorial ranking. The queue at the decision moment holds 48,704 pages.</p>
+  <p>Try it live: <a href="ui/">explore the ranked queue interactively</a> — sort by reason code and archetype, and inspect the per-action mix behind the queue.</p>
   <p><strong>Reason codes:</strong></p>
   <ul>
     <li><code>ctr_opportunity</code>: visible page below its tier CTR. This is the validated signal.</li>
