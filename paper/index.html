@@ -91,7 +91,7 @@
 <section id="abstract">
   <h2>Abstract</h2>
   <div class="abstract">
-    <p>Which of a client's pages should a content reviewer open first for a CTR or engagement fix? We analyzed 120,258 pages from 47 real clients, using features from January and February 2026 to predict an outcome measured in March. We compared a transparent rule (score a page by how much exposure it has and how far its CTR or engagement sits below the norm for its position) against a logistic regression and a random forest, and tested everything on clients the models never saw. On held-out clients, the model did better at the very top of the queue (precision@10: 50% vs 30% for the rule), while the rule held the wider cut (precision@50: 44% vs 32%), against a 15.9% base rate; the random forest did not generalize. The result is a ranked, reason-coded review queue that tells a reviewer which pages to open first, and why.</p>
+    <p>Which of a client's pages should a content reviewer open first for a CTR or engagement fix? We analyzed 120,258 pages from 47 real clients, using features from January and February 2026 to predict an outcome measured in March. We compared a transparent rule (score a page by how much exposure it has and how far its CTR or engagement sits below the norm for its position) against a logistic regression and a random forest, and tested everything on clients the models never saw. On the pre-registered held-out clients, the model did better at the very top of the queue (precision@10: 50% vs 30% for the rule), while the rule held the wider cut (precision@50: 44% vs 32%), against a 15.9% base rate; the random forest did not generalize. The rule-vs-model comparison is not stable across splits or label definitions, so we do not claim the rule is reliably better; it is chosen for transparency. The result is a ranked, reason-coded review queue that tells a reviewer which pages to open first, and why.</p>
   </div>
 </section>
 
@@ -186,15 +186,47 @@
   </table>
   <p class="note">The random forest did not generalize to new clients, and its exact precision moved a few points between runs in our environment, so we report it only qualitatively.</p>
   <ul>
-    <li>Logistic regression wins the very top of the queue: precision@10 50% vs 30% for the rule.</li>
-    <li>The rule holds the wider cut: precision@50 44% vs 32% for logistic regression.</li>
+    <li>Logistic regression wins the very top of the queue on the pre-registered split: precision@10 50% vs 30% for the rule.</li>
+    <li>The rule held the wider cut on the pre-registered split: precision@50 44% vs 32% for logistic regression.</li>
     <li>Both beat the base rate by a wide margin, so the ranking carries real signal.</li>
+    <li>These two bullets are not stable across splits: on 3 of 4 held-out splits logistic regression matched or beat the rule's wider cut, and it dominated at stricter label definitions. We report the rule because it is transparent, not because it consistently wins (see Limitations).</li>
   </ul>
+
+  <h3>At a stricter "below tier" definition, the model wins, validated on fresh clients</h3>
+  <p>"Below tier" is a definition choice. We committed to 0.1pp and saw the rule hold the wider cut there, but a label-cutoff sweep (xp-06) showed the comparison flips, and the stricter end looked very different. Rather than adopt a cutoff from that descriptive sweep, we pre-registered a fair test (xp-07): a fresh client holdout the sweep never touched, a cutoff chosen on the training split only by a coverage rule (the strictest cutoff that still leaves at least 10% of pages "below tier", which was 0.30pp), and a single evaluation on those virgin clients.</p>
+  <table>
+    <tr>
+      <th>Method at 0.30pp (virgin clients)</th>
+      <th class="num">Precision @10</th>
+      <th class="num">Precision @50</th>
+    </tr>
+    <tr>
+      <td>Rule-based baseline</td>
+      <td class="num">30%</td>
+      <td class="num">22%</td>
+    </tr>
+    <tr>
+      <td>Logistic regression</td>
+      <td class="num">80%</td>
+      <td class="num">92%</td>
+    </tr>
+    <tr>
+      <td>Base rate (no model)</td>
+      <td class="num">18.6%</td>
+      <td class="num">18.6%</td>
+    </tr>
+  </table>
+  <p class="note">Pre-registered win criterion (decided before the run): logistic regression wins only if it beats the rule at both precision@10 and precision@50 and clears roughly 2x the base rate. It did: 80/92 vs 30/22, about 5x the base rate, on clients no earlier decision had touched. The win survived the same audits as the earlier experiments: precision holds to k=200 (80/92/88/85% vs the rule's 30/22/17/19%), only 6% of the model's top-50 were pages created after the decision date, and the top-50 spread across two content types and 6 of 10 clients, so this is not a brand-new-page artifact.</p>
+  <ul>
+    <li>The transparent rule is near its base-rate floor at this definition (p@50 22% vs 18.6%): scoring exposure times gap stops separating pages once "below tier" means far behind the tier median.</li>
+    <li>If the stricter 0.30pp definition is adopted, logistic regression is the validated model; the rule remains the transparent baseline at the committed 0.1pp definition.</li>
+  </ul>
+
   <p>The trap we avoided: on a random split the models look near perfect (precision@50 96% for both), because pages from the same client leak across both sides. The drop from that split to the client holdout is how much memorization was hiding.</p>
 
   <figure>
     <img src="assets/playbook_precision_at_k.svg" alt="Precision at 10 and 50 on the client-holdout split for the rule, logistic regression, and random forest.">
-    <figcaption><span class="takeaway">Takeaway: the rule and the model tie at the top; the rule wins the wider cut. Both beat the base rate.</span></figcaption>
+    <figcaption><span class="takeaway">Takeaway: on the pre-registered split the rule and the model tie at the top and the rule leads the wider cut; across splits the comparison is not stable. The rule is chosen for transparency, and both beat the base rate.</span></figcaption>
   </figure>
 
   <h3>The signal behind the rule</h3>
@@ -217,7 +249,9 @@
     <li><strong>The engagement arm is directional, not validated.</strong> It treats one click as roughly one engaged session, a conservative proxy for content fixes.</li>
     <li><strong>Client mix shifts the base rate.</strong> The held-out clients happened to have a lower below-tier rate (15.9% vs 57.5% on the random split), so results depend on which clients the queue is applied to.</li>
     <li><strong>Random forest precision was not stable run to run</strong> in our environment, so we report it only qualitatively.</li>
-    <li><strong>We tried harder models; none beat the rule.</strong> Beyond the ones shown here, we ran an extended experiment round (gradient boosting, extra features, and a wider model zoo). None of them beat the rule on pages that actually existed at the decision moment; the apparent wins were artifacts of ranking brand-new pages. Full record in the <a href="https://github.com/NameRectified/flyrank-ml-internship/blob/main/work/experiments/README.md">experiment log</a>.</li>
+    <li><strong>We tried harder models; none beat the rule on the pre-registered split.</strong> Beyond the ones shown here, we ran an extended experiment round (gradient boosting, extra features, and a wider model zoo). None of them beat the rule on the pre-registered split under the committed 0.1pp definition, on pages that actually existed at the decision moment; the apparent wins were artifacts of ranking brand-new pages. Full record in the <a href="https://github.com/NameRectified/flyrank-ml-internship/blob/main/work/experiments/README.md">experiment log</a>.</li>
+    <li><strong>The result depends on how "below tier" is defined.</strong> We swept the label cutoff around the committed 0.1pp value. On the pre-registered split the rule beats logistic regression at that cutoff and looser ones, but at stricter cutoffs (0.2–0.3pp) logistic regression dominates, and beyond ~0.4pp no page in the data is below tier at all. The committed 0.1pp definition stays; the sweep is recorded in the <a href="https://github.com/NameRectified/flyrank-ml-internship/blob/main/work/experiments/README.md">experiment log</a>.</li>
+    <li><strong>The rule-vs-model comparison is not stable across splits.</strong> The wider-cut rule win in Section 4 is from the pre-registered split (seed 42); across three other client-holdout splits logistic regression matched or beat the rule's precision@50 (3 of 4 splits at the committed cutoff, 4 of 4 at stricter label definitions). The pre-registered confirmatory test on fresh held-out clients (xp-07) then validated the strict-cutoff logistic-regression lead: at 0.30pp the model reached precision@50 92% vs the rule's 22% (about 5x the base rate), while the rule sat near its base-rate floor. At the stricter definition the model is the recommended choice; the 0.1pp rule remains the transparent baseline.</li>
   </ul>
 </section>
 
@@ -229,8 +263,9 @@
     <li><strong>ctr_arm:</strong> exposure times the CTR gap over the tier median, only for pages with at least 500 impressions and a gap over 0.1 percentage points.</li>
     <li><strong>eng_arm:</strong> the engagement gap below <code>eng_target</code> (the weighted median engagement rate for the page's content type and intent), scaled by sessions, only for pages with at least 50 sessions.</li>
   </ul>
+  <p><strong>Validated alternative:</strong> a pre-registered test on fresh clients (xp-07) showed that under a stricter "below tier" definition (0.30pp instead of 0.1pp) a logistic regression clearly beats the rule (precision@50 92% vs 22%, about 5x the base rate), where the rule sat near its own base-rate floor. Teams that adopt the stricter definition should rank with the model; the rule stays the transparent choice at the committed 0.1pp definition.</p>
   <p><strong>Queue:</strong> pages with a <code>ctr_opportunity</code> or an <code>engagement_gap</code> flag, sorted by score, highest first. Refresh-only pages are counted but kept out, because refreshing is a scheduled task that does not need editorial ranking. The queue at the decision moment holds 48,704 pages.</p>
-  <p>Try it live: <a href="ui/">explore the ranked queue interactively</a> — sort by reason code and archetype, and inspect the per-action mix behind the queue.</p>
+  <p>Try it live: <a href="ui/">explore the ranked queue interactively</a>, sort by reason code and archetype, and inspect the per-action mix behind the queue.</p>
   <p><strong>Reason codes:</strong></p>
   <ul>
     <li><code>ctr_opportunity</code>: visible page below its tier CTR. This is the validated signal.</li>
